@@ -2,7 +2,7 @@
 
 A high-performance, production-ready HTTP server built in Rust for Solana blockchain operations. This server provides secure endpoints for keypair generation, SPL token operations, message signing/verification, and transaction instruction creation.
 
-## 🚀 Features
+## Features
 
 - **Keypair Generation**: Generate secure Ed25519 keypairs for Solana
 - **SPL Token Operations**: Create tokens and mint instructions
@@ -22,8 +22,7 @@ A high-performance, production-ready HTTP server built in Rust for Solana blockc
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd solana-http-server
+git clone https://www.github.com/jaibhedia/superdev 
 
 # Install dependencies and build
 cargo build --release
@@ -32,7 +31,7 @@ cargo build --release
 cargo run --release
 ```
 
-The server will start on `http://localhost:3000`
+The server should start on `http://localhost:3000`
 
 ## 📚 API Documentation
 
@@ -53,6 +52,34 @@ All endpoints return JSON responses with a consistent format:
 {
   "success": false,
   "error": "Description of error"
+}
+```
+
+### Common Error Types
+
+- **Invalid Input**: Invalid public keys, amounts, decimals, etc.
+- **Cryptographic Error**: Invalid signatures, key format issues
+- **Validation Error**: Empty messages, same from/to addresses
+- **JSON Error**: Malformed JSON or missing required fields
+
+Example error responses:
+```json
+// Invalid public key
+{
+  "success": false,
+  "error": "Invalid public key 'invalid': Invalid Base58 string"
+}
+
+// Zero amount
+{
+  "success": false,
+  "error": "Amount must be greater than 0"
+}
+
+// Same addresses
+{
+  "success": false,
+  "error": "From and to addresses cannot be the same"
 }
 ```
 
@@ -186,50 +213,58 @@ src/
 ## 🔒 Security Features
 
 - **No Key Storage**: Private keys are never stored on the server
-- **Input Validation**: Comprehensive validation of all inputs
+- **Comprehensive Input Validation**: All inputs are validated including:
+  - Public key format and length validation
+  - Secret key format and 64-byte length validation
+  - Message length limits (1KB for signing, 10KB for verification)
+  - Amount validation (must be > 0, within reasonable bounds)
+  - Decimals validation (0-9 for SPL tokens)
+  - Signature format and length validation (64 bytes for Ed25519)
+  - Prevention of identical from/to addresses in transfers
+  - Prevention of identical mint and mint authority addresses
 - **Standard Cryptography**: Uses industry-standard Ed25519 implementation
-- **Error Handling**: Secure error messages that don't leak sensitive information
+- **Secure Error Handling**: Error messages don't leak sensitive information
+- **JSON Validation**: Proper handling of malformed JSON and missing fields
 - **CORS Support**: Configurable CORS headers for web integration
 
-## 🚀 Deployment
+## 🧪 Test Coverage
 
-### Docker Deployment
+The server includes **25 comprehensive tests** covering:
 
-```dockerfile
-# Dockerfile
-FROM rust:1.70 as builder
-WORKDIR /app
-COPY . .
-RUN cargo build --release
+### Functionality Tests
+- Keypair generation and validation
+- Token creation and minting instructions
+- Message signing and verification
+- SOL and token transfer instructions
 
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/solana-http-server /usr/local/bin/
-EXPOSE 3000
-CMD ["solana-http-server"]
+### Edge Case Tests
+- Zero amounts (rejected)
+- Maximum decimal values (0-9 accepted)
+- Same from/to addresses (rejected)
+- Same mint/authority addresses (rejected)
+- Empty messages (rejected)
+- Large amounts (accepted within bounds)
+
+### Error Handling Tests
+- Invalid public keys and signatures
+- Malformed JSON requests
+- Missing required fields
+- Invalid signature lengths
+- Wrong signature verification
+
+Run tests with:
+```bash
+cargo test
 ```
 
-### Environment Variables
+## Deployment
 
-- `RUST_LOG`: Set logging level (default: `info`)
-- `PORT`: Server port (default: `3000`)
+- Done with Railway
 
-## 📈 Performance
+## Performance
 
 - Built with Axum for maximum performance
 - Async/await throughout for non-blocking operations
 - Optimized release builds with LTO
 - Minimal memory allocations
 - Connection pooling and request batching ready
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

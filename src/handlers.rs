@@ -903,4 +903,66 @@ mod tests {
 
         assert_eq!(json["success"], true);
     }
+
+    #[tokio::test]
+    async fn test_create_token_same_mint_and_authority() {
+        let app = create_test_app().await;
+
+        let request = json!({
+            "mintAuthority": "11111111111111111111111111111112",
+            "mint": "11111111111111111111111111111112",
+            "decimals": 6
+        });
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/token/create")
+                    .header("content-type", "application/json")
+                    .body(Body::from(request.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(json["success"], false);
+        assert!(json["error"].as_str().unwrap().contains("Mint authority and mint address should be different"));
+    }
+
+    #[tokio::test]
+    async fn test_verify_message_invalid_signature_length() {
+        let app = create_test_app().await;
+
+        let request = json!({
+            "message": "Hello, Solana!",
+            "signature": "aGVsbG8=", // Too short base64 signature
+            "pubkey": "11111111111111111111111111111112"
+        });
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/message/verify")
+                    .header("content-type", "application/json")
+                    .body(Body::from(request.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(json["success"], false);
+        assert!(json["error"].as_str().unwrap().contains("Invalid signature length"));
+    }
 }

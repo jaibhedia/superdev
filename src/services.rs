@@ -43,9 +43,18 @@ impl SolanaService {
     /// Create a new SPL token mint instruction
     pub fn create_token_instruction(&self, request: CreateTokenRequest) -> AppResult<InstructionResponse> {
         // Validate inputs
+        validate_pubkey_string(&request.mint_authority)?;
+        validate_pubkey_string(&request.mint)?;
         let mint_authority = validate_pubkey(&request.mint_authority)?;
         let mint = validate_pubkey(&request.mint)?;
         let decimals = validate_decimals(request.decimals)?;
+
+        // Additional validation: mint and mint authority should be different
+        if mint_authority == mint {
+            return Err(AppError::InvalidInput(
+                "Mint authority and mint address should be different".to_string(),
+            ));
+        }
 
         // Create initialize mint instruction
         let instruction = token_instruction::initialize_mint(
@@ -86,6 +95,7 @@ impl SolanaService {
     pub fn sign_message(&self, request: SignMessageRequest) -> AppResult<SignMessageResponse> {
         // Validate inputs
         let message = validate_message(&request.message)?;
+        validate_message_size(message)?;
         let secret_bytes = validate_secret_key(&request.secret)?;
 
         // Extract the actual secret key (first 32 bytes) from Solana format
@@ -117,6 +127,8 @@ impl SolanaService {
     pub fn verify_message(&self, request: VerifyMessageRequest) -> AppResult<VerifyMessageResponse> {
         // Validate inputs
         let message = validate_message(&request.message)?;
+        validate_message_size(message)?;
+        validate_pubkey_string(&request.pubkey)?;
         let pubkey = validate_pubkey(&request.pubkey)?;
         let signature_bytes = validate_signature(&request.signature)?;
 

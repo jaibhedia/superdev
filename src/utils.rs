@@ -67,7 +67,39 @@ pub fn validate_message(message: &str) -> AppResult<&str> {
 
 /// Validates base64 encoded signature
 pub fn validate_signature(signature_str: &str) -> AppResult<Vec<u8>> {
-    base64::engine::general_purpose::STANDARD.decode(signature_str).map_err(|e| {
-        AppError::InvalidInput(format!("Invalid base64 signature: {}", e))
-    })
+    let decoded = base64::engine::general_purpose::STANDARD.decode(signature_str)
+        .map_err(|e| AppError::InvalidInput(format!("Invalid base64 signature: {}", e)))?;
+    
+    // Ed25519 signatures are always 64 bytes
+    if decoded.len() != 64 {
+        return Err(AppError::InvalidInput(
+            format!("Invalid signature length: expected 64 bytes, got {}", decoded.len())
+        ));
+    }
+    
+    Ok(decoded)
+}
+
+/// Validates that a public key string is not empty and has reasonable length
+pub fn validate_pubkey_string(pubkey_str: &str) -> AppResult<()> {
+    if pubkey_str.is_empty() {
+        return Err(AppError::InvalidInput("Public key cannot be empty".to_string()));
+    }
+    
+    if pubkey_str.len() > 100 {
+        return Err(AppError::InvalidInput("Public key string too long".to_string()));
+    }
+    
+    Ok(())
+}
+
+/// Validates that a message is within a reasonable size for signing
+pub fn validate_message_size(message: &str) -> AppResult<()> {
+    // For production, you might want to limit message size for performance
+    if message.len() > 10_000 {
+        return Err(AppError::InvalidInput(
+            "Message too large for signing (max 10KB)".to_string(),
+        ));
+    }
+    Ok(())
 }
