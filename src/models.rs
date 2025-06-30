@@ -1,11 +1,23 @@
+//! Data models for API requests and responses
+//!
+//! This module contains all the data structures used for serializing and
+//! deserializing JSON requests and responses. All models are designed to
+//! match the exact API specification.
+
 use serde::{Deserialize, Serialize};
 
+// ===== Keypair Models =====
+
+/// Response for keypair generation endpoint
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KeypairResponse {
+    /// Base58-encoded public key
     pub pubkey: String,
+    /// Base58-encoded secret key (64 bytes total - 32 byte secret + 32 byte public)
     pub secret: String,
 }
 
+// ===== Token Creation Models =====
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTokenRequest {
     #[serde(rename = "mintAuthority")]
@@ -14,14 +26,16 @@ pub struct CreateTokenRequest {
     pub decimals: u8,
 }
 
+// ===== Token Minting Models =====
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MintTokenRequest {
     pub mint: String,
-    pub to: String,
+    pub destination: String,
     pub authority: String,
     pub amount: u64,
 }
 
+// ===== Message Signing Models =====
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignMessageRequest {
     pub message: String,
@@ -35,6 +49,7 @@ pub struct SignMessageResponse {
     pub message: String,
 }
 
+// ===== Message Verification Models =====
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VerifyMessageRequest {
     pub message: String,
@@ -49,6 +64,7 @@ pub struct VerifyMessageResponse {
     pub pubkey: String,
 }
 
+// ===== SOL Transfer Models =====
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SendSolRequest {
     pub from: String,
@@ -57,11 +73,27 @@ pub struct SendSolRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct SendSolResponse {
+    pub program_id: String,
+    pub accounts: Vec<String>,
+    pub instruction_data: String,
+}
+
+// ===== Token Transfer Models =====
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SendTokenRequest {
-    pub from: String,
-    pub to: String,
-    pub authority: String,
+    pub destination: String,
+    pub mint: String,
+    pub owner: String,
     pub amount: u64,
+}
+
+// ===== Instruction Response Models =====
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountMeta {
+    pub pubkey: String,
+    pub is_signer: bool,
+    pub is_writable: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,15 +103,7 @@ pub struct InstructionResponse {
     pub instruction_data: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AccountMeta {
-    pub pubkey: String,
-    #[serde(rename = "is_signer")]
-    pub is_signer: bool,
-    #[serde(rename = "is_writable")]
-    pub is_writable: bool,
-}
-
+// Token transfer uses different account format per spec
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TokenTransferAccountMeta {
     pub pubkey: String,
@@ -91,12 +115,5 @@ pub struct TokenTransferAccountMeta {
 pub struct TokenTransferResponse {
     pub program_id: String,
     pub accounts: Vec<TokenTransferAccountMeta>,
-    pub instruction_data: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SolTransferResponse {
-    pub program_id: String,
-    pub accounts: Vec<String>,
     pub instruction_data: String,
 }

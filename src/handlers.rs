@@ -8,13 +8,30 @@ use crate::{
     AppState,
 };
 
-/// Generate a new Solana keypair
+// ===== Keypair Generation =====
+
+/// Generates a new Solana keypair using secure randomness
+///
+/// # Returns
+/// - `200 OK`: New keypair with public and secret keys
+/// - `500 Internal Server Error`: If cryptographic operations fail
 pub async fn generate_keypair(State(state): State<AppState>) -> AppResult<Json<Value>> {
     let keypair = state.solana_service.generate_keypair()?;
     Ok(success_response(keypair))
 }
 
-/// Create a new SPL token mint instruction
+// ===== SPL Token Operations =====
+
+/// Creates a new SPL token mint initialization instruction
+///
+/// # Request Body
+/// - `mintAuthority`: Base58-encoded public key for mint authority
+/// - `mint`: Base58-encoded public key for the mint account
+/// - `decimals`: Number of decimal places (0-9)
+///
+/// # Returns
+/// - `200 OK`: Instruction data for initializing the mint
+/// - `400 Bad Request`: Invalid input parameters
 pub async fn create_token(
     State(state): State<AppState>,
     JsonExtractor(request): JsonExtractor<CreateTokenRequest>,
@@ -23,7 +40,17 @@ pub async fn create_token(
     Ok(success_response(instruction))
 }
 
-/// Create a mint tokens instruction
+/// Creates a mint-to instruction for SPL tokens
+///
+/// # Request Body
+/// - `mint`: Mint address
+/// - `destination`: Destination user address
+/// - `authority`: Authority address for minting
+/// - `amount`: Amount to mint (must be > 0)
+///
+/// # Returns
+/// - `200 OK`: Instruction data for minting tokens
+/// - `400 Bad Request`: Invalid input parameters
 pub async fn mint_token(
     State(state): State<AppState>,
     JsonExtractor(request): JsonExtractor<MintTokenRequest>,
@@ -32,7 +59,17 @@ pub async fn mint_token(
     Ok(success_response(instruction))
 }
 
-/// Sign a message using Ed25519
+// ===== Message Cryptography =====
+
+/// Signs a message using Ed25519 cryptography
+///
+/// # Request Body
+/// - `message`: Message to sign (max 1KB)
+/// - `secret`: Base58-encoded secret key
+///
+/// # Returns
+/// - `200 OK`: Signature, public key, and original message
+/// - `400 Bad Request`: Invalid input parameters or cryptographic errors
 pub async fn sign_message(
     State(state): State<AppState>,
     JsonExtractor(request): JsonExtractor<SignMessageRequest>,
@@ -41,7 +78,16 @@ pub async fn sign_message(
     Ok(success_response(signature))
 }
 
-/// Verify a signed message
+/// Verifies a signed message using Ed25519 cryptography
+///
+/// # Request Body
+/// - `message`: Original message that was signed
+/// - `signature`: Base64-encoded signature
+/// - `pubkey`: Base58-encoded public key
+///
+/// # Returns
+/// - `200 OK`: Verification result with validity status
+/// - `400 Bad Request`: Invalid input parameters
 pub async fn verify_message(
     State(state): State<AppState>,
     JsonExtractor(request): JsonExtractor<VerifyMessageRequest>,
@@ -50,7 +96,18 @@ pub async fn verify_message(
     Ok(success_response(result))
 }
 
-/// Create SOL transfer instruction
+// ===== Transfer Instructions =====
+
+/// Creates a SOL transfer instruction
+///
+/// # Request Body
+/// - `from`: Sender address (base58-encoded)
+/// - `to`: Recipient address (base58-encoded, must be different from sender)
+/// - `lamports`: Amount in lamports (must be > 0)
+///
+/// # Returns
+/// - `200 OK`: Transfer instruction data
+/// - `400 Bad Request`: Invalid input parameters
 pub async fn send_sol(
     State(state): State<AppState>,
     JsonExtractor(request): JsonExtractor<SendSolRequest>,
@@ -59,7 +116,17 @@ pub async fn send_sol(
     Ok(success_response(instruction))
 }
 
-/// Create SPL token transfer instruction
+/// Creates an SPL token transfer instruction
+///
+/// # Request Body
+/// - `destination`: Destination user address
+/// - `mint`: Mint address
+/// - `owner`: Owner address (must be different from destination)
+/// - `amount`: Amount to transfer (must be > 0)
+///
+/// # Returns
+/// - `200 OK`: Transfer instruction data
+/// - `400 Bad Request`: Invalid input parameters
 pub async fn send_token(
     State(state): State<AppState>,
     JsonExtractor(request): JsonExtractor<SendTokenRequest>,
@@ -111,7 +178,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], true);
@@ -137,9 +206,11 @@ mod tests {
             .await
             .unwrap();
 
-        let keypair_body = axum::body::to_bytes(keypair_response.into_body(), usize::MAX).await.unwrap();
+        let keypair_body = axum::body::to_bytes(keypair_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let keypair_json: Value = serde_json::from_slice(&keypair_body).unwrap();
-        
+
         let pubkey = keypair_json["data"]["pubkey"].as_str().unwrap();
         let secret = keypair_json["data"]["secret"].as_str().unwrap();
 
@@ -164,7 +235,9 @@ mod tests {
 
         assert_eq!(sign_response.status(), StatusCode::OK);
 
-        let sign_body = axum::body::to_bytes(sign_response.into_body(), usize::MAX).await.unwrap();
+        let sign_body = axum::body::to_bytes(sign_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let sign_json: Value = serde_json::from_slice(&sign_body).unwrap();
 
         assert_eq!(sign_json["success"], true);
@@ -191,7 +264,9 @@ mod tests {
 
         assert_eq!(verify_response.status(), StatusCode::OK);
 
-        let verify_body = axum::body::to_bytes(verify_response.into_body(), usize::MAX).await.unwrap();
+        let verify_body = axum::body::to_bytes(verify_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let verify_json: Value = serde_json::from_slice(&verify_body).unwrap();
 
         assert_eq!(verify_json["success"], true);
@@ -222,7 +297,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], true);
@@ -255,7 +332,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
@@ -286,7 +365,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], true);
@@ -302,7 +383,7 @@ mod tests {
 
         let request = json!({
             "mint": "11111111111111111111111111111112",
-            "to": "11111111111111111111111111111113",
+            "destination": "11111111111111111111111111111113",
             "authority": "11111111111111111111111111111114",
             "amount": 1000000
         });
@@ -321,7 +402,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], true);
@@ -335,9 +418,9 @@ mod tests {
         let app = create_test_app().await;
 
         let request = json!({
-            "from": "11111111111111111111111111111112",
-            "to": "11111111111111111111111111111113",
-            "authority": "11111111111111111111111111111114",
+            "destination": "11111111111111111111111111111112",
+            "mint": "11111111111111111111111111111113",
+            "owner": "11111111111111111111111111111114",
             "amount": 1000000
         });
 
@@ -355,7 +438,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], true);
@@ -389,11 +474,16 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
-        assert!(json["error"].as_str().unwrap().contains("Amount must be greater than 0"));
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Amount must be greater than 0"));
     }
 
     #[tokio::test]
@@ -401,9 +491,9 @@ mod tests {
         let app = create_test_app().await;
 
         let request = json!({
-            "from": "11111111111111111111111111111112",
-            "to": "11111111111111111111111111111113",
-            "authority": "11111111111111111111111111111114",
+            "destination": "11111111111111111111111111111112",
+            "mint": "11111111111111111111111111111113",
+            "owner": "11111111111111111111111111111114",
             "amount": 0
         });
 
@@ -421,11 +511,16 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
-        assert!(json["error"].as_str().unwrap().contains("Amount must be greater than 0"));
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Amount must be greater than 0"));
     }
 
     #[tokio::test]
@@ -434,7 +529,7 @@ mod tests {
 
         let request = json!({
             "mint": "11111111111111111111111111111112",
-            "to": "11111111111111111111111111111113",
+            "destination": "11111111111111111111111111111113",
             "authority": "11111111111111111111111111111114",
             "amount": 0
         });
@@ -453,11 +548,16 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
-        assert!(json["error"].as_str().unwrap().contains("Amount must be greater than 0"));
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Amount must be greater than 0"));
     }
 
     #[tokio::test]
@@ -484,11 +584,16 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
-        assert!(json["error"].as_str().unwrap().contains("Decimals must be between 0 and 9"));
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Decimals must be between 0 and 9"));
     }
 
     #[tokio::test]
@@ -514,7 +619,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
@@ -545,7 +652,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
@@ -576,7 +685,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
@@ -607,11 +718,16 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
-        assert!(json["error"].as_str().unwrap().contains("From and to addresses cannot be the same"));
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("From and to addresses cannot be the same"));
     }
 
     #[tokio::test]
@@ -619,9 +735,9 @@ mod tests {
         let app = create_test_app().await;
 
         let request = json!({
-            "from": "11111111111111111111111111111112",
-            "to": "11111111111111111111111111111112",
-            "authority": "11111111111111111111111111111114",
+            "destination": "11111111111111111111111111111112",
+            "mint": "11111111111111111111111111111113",
+            "owner": "11111111111111111111111111111112",
             "amount": 1000000
         });
 
@@ -639,11 +755,16 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
-        assert!(json["error"].as_str().unwrap().contains("From and to addresses cannot be the same"));
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("From and to addresses cannot be the same"));
     }
 
     #[tokio::test]
@@ -707,7 +828,9 @@ mod tests {
             .await
             .unwrap();
 
-        let keypair_body = axum::body::to_bytes(keypair_response.into_body(), usize::MAX).await.unwrap();
+        let keypair_body = axum::body::to_bytes(keypair_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let keypair_json: Value = serde_json::from_slice(&keypair_body).unwrap();
         let pubkey = keypair_json["data"]["pubkey"].as_str().unwrap();
         let secret = keypair_json["data"]["secret"].as_str().unwrap();
@@ -731,7 +854,9 @@ mod tests {
             .await
             .unwrap();
 
-        let sign_body = axum::body::to_bytes(sign_response.into_body(), usize::MAX).await.unwrap();
+        let sign_body = axum::body::to_bytes(sign_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let sign_json: Value = serde_json::from_slice(&sign_body).unwrap();
         let signature = sign_json["data"]["signature"].as_str().unwrap();
 
@@ -756,7 +881,9 @@ mod tests {
 
         assert_eq!(verify_response.status(), StatusCode::OK);
 
-        let verify_body = axum::body::to_bytes(verify_response.into_body(), usize::MAX).await.unwrap();
+        let verify_body = axum::body::to_bytes(verify_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let verify_json: Value = serde_json::from_slice(&verify_body).unwrap();
 
         assert_eq!(verify_json["success"], true);
@@ -787,7 +914,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], true);
@@ -811,7 +940,9 @@ mod tests {
             .await
             .unwrap();
 
-        let keypair_body = axum::body::to_bytes(keypair_response.into_body(), usize::MAX).await.unwrap();
+        let keypair_body = axum::body::to_bytes(keypair_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let keypair_json: Value = serde_json::from_slice(&keypair_body).unwrap();
         let secret = keypair_json["data"]["secret"].as_str().unwrap();
 
@@ -835,11 +966,16 @@ mod tests {
 
         assert_eq!(sign_response.status(), StatusCode::BAD_REQUEST);
 
-        let sign_body = axum::body::to_bytes(sign_response.into_body(), usize::MAX).await.unwrap();
+        let sign_body = axum::body::to_bytes(sign_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let sign_json: Value = serde_json::from_slice(&sign_body).unwrap();
 
         assert_eq!(sign_json["success"], false);
-        assert!(sign_json["error"].as_str().unwrap().contains("Message cannot be empty"));
+        assert!(sign_json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Message cannot be empty"));
     }
 
     #[tokio::test]
@@ -867,7 +1003,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], true);
@@ -898,7 +1036,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], true);
@@ -928,11 +1068,16 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
-        assert!(json["error"].as_str().unwrap().contains("Mint authority and mint address should be different"));
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Mint authority and mint address should be different"));
     }
 
     #[tokio::test]
@@ -959,10 +1104,15 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(json["success"], false);
-        assert!(json["error"].as_str().unwrap().contains("Invalid signature length"));
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Invalid signature length"));
     }
 }

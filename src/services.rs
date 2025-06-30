@@ -1,12 +1,15 @@
+//! Core business logic for Solana operations
+//!
+//! This module contains the [`SolanaService`] which handles all Solana-related
+//! operations including keypair generation, token operations, message signing,
+//! and transaction instruction creation.
+
+use base64::Engine;
 use ed25519_dalek::{Keypair, PublicKey, SecretKey, Signature, Signer, Verifier};
 use rand_core::OsRng;
-use solana_sdk::{
-    instruction::Instruction,
-    system_instruction,
-};
+use solana_sdk::{instruction::Instruction, system_instruction};
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::instruction as token_instruction;
-use base64::Engine;
 
 use crate::{
     error::{AppError, AppResult},
@@ -14,14 +17,22 @@ use crate::{
     utils::*,
 };
 
+/// Core service for handling Solana-related operations
+///
+/// This service provides a clean, stateless interface for all Solana blockchain
+/// operations. It handles input validation, cryptographic operations, and
+/// instruction generation while maintaining security best practices.
+#[derive(Debug, Clone)]
 pub struct SolanaService;
 
 impl SolanaService {
-    pub fn new() -> Self {
+    /// Creates a new instance of the SolanaService
+    pub const fn new() -> Self {
         Self
     }
 
-    /// Generate a new Ed25519 keypair for Solana
+    /// Generates a new Ed25519 keypair for Solana
+    /// Returns both the public key and secret key in base58 format
     pub fn generate_keypair(&self) -> AppResult<KeypairResponse> {
         let mut csprng = OsRng;
         let keypair = Keypair::generate(&mut csprng);
@@ -40,23 +51,27 @@ impl SolanaService {
         })
     }
 
-    /// Create a new SPL token mint instruction
-    pub fn create_token_instruction(&self, request: CreateTokenRequest) -> AppResult<InstructionResponse> {
-        // Validate inputs
-        validate_pubkey_string(&request.mint_authority)?;
-        validate_pubkey_string(&request.mint)?;
+    /// Creates a new SPL token mint initialization instruction
+    /// Validates all inputs and returns the instruction data
+    pub fn create_token_instruction(
+        &self,
+        request: CreateTokenRequest,
+    ) -> AppResult<InstructionResponse> {
+        // Comprehensive input validation
+        self.validate_create_token_request(&request)?;
+
         let mint_authority = validate_pubkey(&request.mint_authority)?;
         let mint = validate_pubkey(&request.mint)?;
         let decimals = validate_decimals(request.decimals)?;
 
-        // Additional validation: mint and mint authority should be different
+        // Business logic validation
         if mint_authority == mint {
             return Err(AppError::InvalidInput(
                 "Mint authority and mint address should be different".to_string(),
             ));
         }
 
-        // Create initialize mint instruction
+        // Create the initialize mint instruction
         let instruction = token_instruction::initialize_mint(
             &spl_token::id(),
             &mint,
@@ -69,11 +84,17 @@ impl SolanaService {
         Ok(self.instruction_to_response(instruction))
     }
 
-    /// Create a mint tokens instruction
-    pub fn mint_token_instruction(&self, request: MintTokenRequest) -> AppResult<InstructionResponse> {
-        // Validate inputs
+    /// Creates a mint-to instruction for SPL tokens
+    /// Validates all inputs and creates proper mint instruction
+    pub fn mint_token_instruction(
+        &self,
+        request: MintTokenRequest,
+    ) -> AppResult<InstructionResponse> {
+        // Comprehensive input validation
+        self.validate_mint_token_request(&request)?;
+
         let mint = validate_pubkey(&request.mint)?;
-        let destination = validate_pubkey(&request.to)?;
+        let destination = validate_pubkey(&request.destination)?;
         let authority = validate_pubkey(&request.authority)?;
         let amount = validate_amount(request.amount)?;
 
@@ -91,9 +112,12 @@ impl SolanaService {
         Ok(self.instruction_to_response(instruction))
     }
 
-    /// Sign a message using Ed25519
+    /// Signs a message using Ed25519 cryptography
+    /// Returns signature, public key, and original message
     pub fn sign_message(&self, request: SignMessageRequest) -> AppResult<SignMessageResponse> {
-        // Validate inputs
+        // Comprehensive input validation
+        self.validate_sign_message_request(&request)?;
+
         let message = validate_message(&request.message)?;
         validate_message_size(message)?;
         let secret_bytes = validate_secret_key(&request.secret)?;
@@ -123,9 +147,15 @@ impl SolanaService {
         })
     }
 
-    /// Verify a signed message
-    pub fn verify_message(&self, request: VerifyMessageRequest) -> AppResult<VerifyMessageResponse> {
-        // Validate inputs
+    /// Verifies a signed message using Ed25519 cryptography
+    /// Returns whether the signature is valid along with message details
+    pub fn verify_message(
+        &self,
+        request: VerifyMessageRequest,
+    ) -> AppResult<VerifyMessageResponse> {
+        // Comprehensive input validation
+        self.validate_verify_message_request(&request)?;
+
         let message = validate_message(&request.message)?;
         validate_message_size(message)?;
         validate_pubkey_string(&request.pubkey)?;
@@ -151,14 +181,17 @@ impl SolanaService {
         })
     }
 
-    /// Create SOL transfer instruction
-    pub fn send_sol_instruction(&self, request: SendSolRequest) -> AppResult<SolTransferResponse> {
-        // Validate inputs
+    /// Creates a SOL transfer instruction
+    /// Validates inputs and ensures proper transfer setup
+    pub fn send_sol_instruction(&self, request: SendSolRequest) -> AppResult<SendSolResponse> {
+        // Comprehensive input validation
+        self.validate_send_sol_request(&request)?;
+
         let from = validate_pubkey(&request.from)?;
         let to = validate_pubkey(&request.to)?;
         let lamports = validate_amount(request.lamports)?;
 
-        // Validate that from and to are different
+        // Business logic validation
         if from == to {
             return Err(AppError::InvalidInput(
                 "From and to addresses cannot be the same".to_string(),
@@ -168,7 +201,7 @@ impl SolanaService {
         // Create transfer instruction
         let instruction = system_instruction::transfer(&from, &to, lamports);
 
-        Ok(SolTransferResponse {
+        Ok(SendSolResponse {
             program_id: instruction.program_id.to_string(),
             accounts: instruction
                 .accounts
@@ -179,40 +212,43 @@ impl SolanaService {
         })
     }
 
-    /// Create SPL token transfer instruction
-    pub fn send_token_instruction(&self, request: SendTokenRequest) -> AppResult<TokenTransferResponse> {
-        // Validate inputs
-        let from = validate_pubkey(&request.from)?;
-        let to = validate_pubkey(&request.to)?;
-        let authority = validate_pubkey(&request.authority)?;
+    /// Creates an SPL token transfer instruction
+    /// Validates inputs and creates proper token transfer
+    pub fn send_token_instruction(
+        &self,
+        request: SendTokenRequest,
+    ) -> AppResult<TokenTransferResponse> {
+        // Comprehensive input validation
+        self.validate_send_token_request(&request)?;
+
+        let destination = validate_pubkey(&request.destination)?;
+        let mint = validate_pubkey(&request.mint)?;
+        let owner = validate_pubkey(&request.owner)?;
         let amount = validate_amount(request.amount)?;
 
-        // Validate that from and to are different
-        if from == to {
+        // Business logic validation
+        if destination == owner {
             return Err(AppError::InvalidInput(
                 "From and to addresses cannot be the same".to_string(),
             ));
         }
 
-        // For this instruction, we'll need to assume a mint. In real implementation, 
-        // this would be part of the request or derived from token accounts
-        // For now, using a mock mint address
-        let mock_mint = validate_pubkey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")?;
-
         // Get associated token accounts
-        let source_ata = get_associated_token_address(&from, &mock_mint);
-        let dest_ata = get_associated_token_address(&to, &mock_mint);
+        let source_ata = get_associated_token_address(&owner, &mint);
+        let dest_ata = get_associated_token_address(&destination, &mint);
 
         // Create transfer instruction
         let instruction = token_instruction::transfer(
             &spl_token::id(),
             &source_ata,
             &dest_ata,
-            &authority,
+            &owner,
             &[],
             amount,
         )
-        .map_err(|e| AppError::SolanaError(format!("Failed to create transfer instruction: {}", e)))?;
+        .map_err(|e| {
+            AppError::SolanaError(format!("Failed to create transfer instruction: {}", e))
+        })?;
 
         Ok(TokenTransferResponse {
             program_id: instruction.program_id.to_string(),
@@ -228,6 +264,88 @@ impl SolanaService {
         })
     }
 
+    // ===== Private Validation Methods =====
+
+    /// Validates create token request
+    fn validate_create_token_request(&self, request: &CreateTokenRequest) -> AppResult<()> {
+        if request.mint_authority.trim().is_empty() {
+            return Err(AppError::InvalidInput(
+                "mintAuthority is required".to_string(),
+            ));
+        }
+        if request.mint.trim().is_empty() {
+            return Err(AppError::InvalidInput("mint is required".to_string()));
+        }
+        validate_pubkey_string(&request.mint_authority)?;
+        validate_pubkey_string(&request.mint)?;
+        Ok(())
+    }
+
+    /// Validates mint token request
+    fn validate_mint_token_request(&self, request: &MintTokenRequest) -> AppResult<()> {
+        if request.mint.trim().is_empty() {
+            return Err(AppError::InvalidInput("mint is required".to_string()));
+        }
+        if request.destination.trim().is_empty() {
+            return Err(AppError::InvalidInput(
+                "destination is required".to_string(),
+            ));
+        }
+        if request.authority.trim().is_empty() {
+            return Err(AppError::InvalidInput("authority is required".to_string()));
+        }
+        Ok(())
+    }
+
+    /// Validates sign message request
+    fn validate_sign_message_request(&self, request: &SignMessageRequest) -> AppResult<()> {
+        if request.secret.trim().is_empty() {
+            return Err(AppError::InvalidInput("secret is required".to_string()));
+        }
+        Ok(())
+    }
+
+    /// Validates verify message request
+    fn validate_verify_message_request(&self, request: &VerifyMessageRequest) -> AppResult<()> {
+        if request.message.trim().is_empty() {
+            return Err(AppError::InvalidInput("message is required".to_string()));
+        }
+        if request.signature.trim().is_empty() {
+            return Err(AppError::InvalidInput("signature is required".to_string()));
+        }
+        if request.pubkey.trim().is_empty() {
+            return Err(AppError::InvalidInput("pubkey is required".to_string()));
+        }
+        Ok(())
+    }
+
+    /// Validates send SOL request
+    fn validate_send_sol_request(&self, request: &SendSolRequest) -> AppResult<()> {
+        if request.from.trim().is_empty() {
+            return Err(AppError::InvalidInput("from is required".to_string()));
+        }
+        if request.to.trim().is_empty() {
+            return Err(AppError::InvalidInput("to is required".to_string()));
+        }
+        Ok(())
+    }
+
+    /// Validates send token request
+    fn validate_send_token_request(&self, request: &SendTokenRequest) -> AppResult<()> {
+        if request.destination.trim().is_empty() {
+            return Err(AppError::InvalidInput(
+                "destination is required".to_string(),
+            ));
+        }
+        if request.mint.trim().is_empty() {
+            return Err(AppError::InvalidInput("mint is required".to_string()));
+        }
+        if request.owner.trim().is_empty() {
+            return Err(AppError::InvalidInput("owner is required".to_string()));
+        }
+        Ok(())
+    }
+
     /// Helper to convert Instruction to InstructionResponse
     fn instruction_to_response(&self, instruction: Instruction) -> InstructionResponse {
         InstructionResponse {
@@ -235,7 +353,7 @@ impl SolanaService {
             accounts: instruction
                 .accounts
                 .into_iter()
-                .map(|acc| crate::models::AccountMeta {
+                .map(|acc| AccountMeta {
                     pubkey: acc.pubkey.to_string(),
                     is_signer: acc.is_signer,
                     is_writable: acc.is_writable,
@@ -243,5 +361,11 @@ impl SolanaService {
                 .collect(),
             instruction_data: base64::engine::general_purpose::STANDARD.encode(&instruction.data),
         }
+    }
+}
+
+impl Default for SolanaService {
+    fn default() -> Self {
+        Self::new()
     }
 }

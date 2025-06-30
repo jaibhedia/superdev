@@ -19,7 +19,7 @@ where
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
         let json_extractor = axum::extract::Json::<T>::from_request(req, state).await;
-        
+
         match json_extractor {
             Ok(axum::extract::Json(data)) => Ok(JsonExtractor(data)),
             Err(rejection) => {
