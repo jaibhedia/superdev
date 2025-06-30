@@ -44,7 +44,7 @@ pub fn validate_amount(amount: u64) -> AppResult<u64> {
 pub fn validate_decimals(decimals: u8) -> AppResult<u8> {
     if decimals > 9 {
         return Err(AppError::InvalidInput(
-            "Token decimals cannot exceed 9".to_string(),
+            "Decimals must be between 0 and 9".to_string(),
         ));
     }
     Ok(decimals)

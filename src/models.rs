@@ -17,7 +17,7 @@ pub struct CreateTokenRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MintTokenRequest {
     pub mint: String,
-    pub destination: String,
+    pub to: String,
     pub authority: String,
     pub amount: u64,
 }
@@ -58,9 +58,9 @@ pub struct SendSolRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SendTokenRequest {
-    pub destination: String,
-    pub mint: String,
-    pub owner: String,
+    pub from: String,
+    pub to: String,
+    pub authority: String,
     pub amount: u64,
 }
 

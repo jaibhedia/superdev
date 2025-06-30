@@ -9,6 +9,7 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod error;
+mod extractors;
 mod handlers;
 mod models;
 mod services;

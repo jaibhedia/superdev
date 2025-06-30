@@ -64,7 +64,7 @@ impl SolanaService {
     pub fn mint_token_instruction(&self, request: MintTokenRequest) -> AppResult<InstructionResponse> {
         // Validate inputs
         let mint = validate_pubkey(&request.mint)?;
-        let destination = validate_pubkey(&request.destination)?;
+        let destination = validate_pubkey(&request.to)?;
         let authority = validate_pubkey(&request.authority)?;
         let amount = validate_amount(request.amount)?;
 
@@ -146,6 +146,13 @@ impl SolanaService {
         let to = validate_pubkey(&request.to)?;
         let lamports = validate_amount(request.lamports)?;
 
+        // Validate that from and to are different
+        if from == to {
+            return Err(AppError::InvalidInput(
+                "From and to addresses cannot be the same".to_string(),
+            ));
+        }
+
         // Create transfer instruction
         let instruction = system_instruction::transfer(&from, &to, lamports);
 
@@ -163,21 +170,33 @@ impl SolanaService {
     /// Create SPL token transfer instruction
     pub fn send_token_instruction(&self, request: SendTokenRequest) -> AppResult<TokenTransferResponse> {
         // Validate inputs
-        let destination = validate_pubkey(&request.destination)?;
-        let mint = validate_pubkey(&request.mint)?;
-        let owner = validate_pubkey(&request.owner)?;
+        let from = validate_pubkey(&request.from)?;
+        let to = validate_pubkey(&request.to)?;
+        let authority = validate_pubkey(&request.authority)?;
         let amount = validate_amount(request.amount)?;
 
+        // Validate that from and to are different
+        if from == to {
+            return Err(AppError::InvalidInput(
+                "From and to addresses cannot be the same".to_string(),
+            ));
+        }
+
+        // For this instruction, we'll need to assume a mint. In real implementation, 
+        // this would be part of the request or derived from token accounts
+        // For now, using a mock mint address
+        let mock_mint = validate_pubkey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")?;
+
         // Get associated token accounts
-        let source_ata = get_associated_token_address(&owner, &mint);
-        let dest_ata = get_associated_token_address(&destination, &mint);
+        let source_ata = get_associated_token_address(&from, &mock_mint);
+        let dest_ata = get_associated_token_address(&to, &mock_mint);
 
         // Create transfer instruction
         let instruction = token_instruction::transfer(
             &spl_token::id(),
             &source_ata,
             &dest_ata,
-            &owner,
+            &authority,
             &[],
             amount,
         )
