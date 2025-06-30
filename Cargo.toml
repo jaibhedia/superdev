@@ -1,0 +1,56 @@
+[package]
+name = "solana-http-server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shantanu Swami shannswami1234@gmail.com"]
+description = "A http server for the fellowship test by superdev"
+license = "MIT"
+repository = "https://github.com/jaibhedia/superdev"
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros", "json"] }
+tokio = { version = "1.0", features = ["full"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Solana dependencies
+solana-sdk = "1.17"
+solana-client = "1.17"
+spl-token = "4.0"
+spl-associated-token-account = "2.3"
+
+# Cryptography
+ed25519-dalek = { version = "1.0", features = ["rand"] }
+rand_core = { version = "0.5", features = ["std"] }
+base64 = "0.21"
+bs58 = "0.5"
+rand = "0.7"
+
+# Error handling and logging
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json"] }
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
